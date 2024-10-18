@@ -23,3 +23,8 @@ FOREIGN KEY (user_id) REFERENCES users(id)
 
 - cd <path-to-folder-dir>
 - node server.js
+- open localhost:3000 on browser
+- open localhost::3000 on incognito browser for separate user
+- register both with different names
+- login
+- donezo
