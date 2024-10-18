@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Chat App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Add these color classes for user messages */
+        .user-color-1 {
+            background-color: #E3F2FD;
+            border-left: 4px solid #2196F3;
+        }
+
+        .user-color-2 {
+            background-color: #F3E5F5;
+            border-left: 4px solid #9C27B0;
+        }
+
+        .user-color-3 {
+            background-color: #E8F5E9;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .user-color-4 {
+            background-color: #FFF3E0;
+            border-left: 4px solid #FF9800;
+        }
+
+        .user-color-5 {
+            background-color: #FCE4EC;
+            border-left: 4px solid #E91E63;
+        }
+
+        .message-own {
+            background-color: #E3F2FD !important;
+            border-right: 4px solid #1E88E5 !important;
+            margin-left: auto;
+            width: 80%;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 h-screen flex flex-col">
+    <!-- Header with Username Display -->
+    <div class="bg-white shadow p-4 flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <h1 class="text-xl font-bold">Chat Room</h1>
+            <span id="current-user" class="text-gray-600"></span>
+        </div>
+        <a href="/logout" class="text-red-500 hover:text-red-600">Logout</a>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="flex-1 flex flex-col p-4 overflow-hidden">
+        <div id="messages" class="flex-1 overflow-y-auto space-y-4 pb-4"></div>
+
+        <!-- Input Area -->
+        <div class="bg-white p-4 rounded-lg shadow-lg">
+            <form id="message-form" class="flex gap-2">
+                <input type="file" id="file-input" class="hidden">
+                <button type="button" id="file-btn" class="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
+                    📎
+                </button>
+                <input type="text" id="message-input" class="flex-1 border rounded px-3 py-2"
+                    placeholder="Type your message...">
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Send
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const messages = document.getElementById('messages');
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message-input');
+        const fileBtn = document.getElementById('file-btn');
+        const fileInput = document.getElementById('file-input');
+        const currentUserSpan = document.getElementById('current-user');
+
+        let currentUsername = '';
+        let currentUserId = '';
+        let currentFilePath = null;
+        let userColors = {};
+        let colorIndex = 1;
+
+        // Get current user info when page loads
+        fetch('/get-user-info')
+            .then(response => response.json())
+            .then(user => {
+                currentUsername = user.username;
+                currentUserId = user.userId;
+                currentUserSpan.textContent = `Logged in as: ${currentUsername}`;
+            });
+
+        function getColorForUser(username) {
+            if (!userColors[username]) {
+                userColors[username] = colorIndex;
+                colorIndex = colorIndex === 5 ? 1 : colorIndex + 1;
+            }
+            return `user-color-${userColors[username]}`;
+        }
+
+        fileBtn.onclick = () => fileInput.click();
+
+        fileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.filePath) {
+                currentFilePath = data.filePath;
+                messageInput.value = `Shared a file: ${file.name}`;
+            }
+        };
+
+        messageForm.onsubmit = (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+
+            if (message) {
+                socket.emit('new message', {
+                    userId: currentUserId,
+                    username: currentUsername,
+                    message: message,
+                    filePath: currentFilePath
+                });
+
+                messageInput.value = '';
+                currentFilePath = null;
+                fileInput.value = '';
+            }
+        };
+
+        socket.on('previous messages', (messages) => {
+            messages.forEach(addMessage);
+        });
+
+        socket.on('chat message', addMessage);
+
+        function addMessage(data) {
+            const isOwnMessage = data.username === currentUsername;
+            const div = document.createElement('div');
+            div.className = `p-4 rounded-lg shadow mb-2 ${isOwnMessage ? 'message-own' : getColorForUser(data.username)}`;
+
+            const timestamp = new Date(data.created_at).toLocaleTimeString();
+
+            let content = `
+                <div class="flex justify-between items-start mb-1">
+                    <span class="font-bold">${data.username}</span>
+                    <span class="text-xs text-gray-500">${timestamp}</span>
+                </div>
+                <div class="mt-1">${data.message}</div>
+            `;
+
+            if (data.filePath) {
+                content += `
+                    <div class="mt-2">
+                        <a href="${data.filePath}" 
+                           class="text-blue-500 hover:text-blue-600 inline-flex items-center gap-1" 
+                           target="_blank">
+                           📎 Download File
+                        </a>
+                    </div>
+                `;
+            }
+
+            div.innerHTML = content;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Add message when users join/leave
+        socket.on('user joined', (username) => {
+            const div = document.createElement('div');
+            div.className = 'text-center text-gray-500 my-2';
+            div.textContent = `${username} joined the chat`;
+            messages.appendChild(div);
+        });
+
+        socket.on('user left', (username) => {
+            const div = document.createElement('div');
+            div.className = 'text-center text-gray-500 my-2';
+            div.textContent = `${username} left the chat`;
+            messages.appendChild(div);
+        });
+    </script>
+</body>
+
+</html>
