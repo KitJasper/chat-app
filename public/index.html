@@ -37,6 +37,28 @@
             margin-left: auto;
             width: 80%;
         }
+
+        #emoji-picker {
+            width: auto;
+            position: absolute;
+            bottom: 60px;
+            left: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .emoji-button {
+            font-size: 24px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
     </style>
 </head>
 
@@ -61,6 +83,12 @@
                 <button type="button" id="file-btn" class="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
                     📎
                 </button>
+                <button type="button" id="emoji-btn" class="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
+                    😊
+                </button>
+                <div id="emoji-div" class="hidden">
+                    <emoji-picker id="emoji-picker"></emoji-picker>
+                </div>
                 <input type="text" id="message-input" class="flex-1 border rounded px-3 py-2"
                     placeholder="Type your message...">
                 <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
@@ -72,13 +100,53 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io();
-        const messages = document.getElementById('messages');
-        const messageForm = document.getElementById('message-form');
-        const messageInput = document.getElementById('message-input');
-        const fileBtn = document.getElementById('file-btn');
-        const fileInput = document.getElementById('file-input');
-        const currentUserSpan = document.getElementById('current-user');
+    const socket = io();
+    const messages = document.getElementById('messages');
+    const messageForm = document.getElementById('message-form');
+    const messageInput = document.getElementById('message-input');
+    const fileBtn = document.getElementById('file-btn');
+    const fileInput = document.getElementById('file-input');
+    const currentUserSpan = document.getElementById('current-user');
+    const emojiBtn = document.getElementById('emoji-btn');
+    const emojiDiv = document.getElementById('emoji-div');
+    const emojiPicker = document.getElementById('emoji-picker');
+    const emojis = ['😊', '😂', '🥰', '😎', '🤔', '👍', '❤️', '🎉', '🔥', '✨', '🌟', '💯', '😅', '🙌', '🤝', '👋', '🎨', '🚀'];
+
+    emojiBtn.addEventListener('click', (event) => {
+        event.stopPropagation(); // Prevent the click event from bubbling up
+        emojiDiv.classList.toggle('hidden'); // Show/hide emoji picker
+    });
+
+    emojis.forEach(emoji => {
+        const emojiButton = document.createElement('button');
+        emojiButton.classList.add('emoji-button');
+        emojiButton.textContent = emoji;
+        emojiButton.addEventListener('click', () => {
+            messageInput.value += emoji; // Add emoji to the input field
+        });
+        emojiPicker.appendChild(emojiButton);
+    });
+
+    // Close the emoji picker when Enter is pressed, and avoid sending empty messages
+    messageInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();  // Prevent the form from submitting
+    
+            if (messageInput.value.trim()) {  // Only send message if input is not empty
+                messageForm.submit();         // Trigger message form submit
+                emojiDiv.classList.add('hidden');  // Close emoji picker when message is sent
+            }
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!emojiBtn.contains(e.target) && !emojiDiv.contains(e.target)) {
+            emojiDiv.classList.add('hidden'); // Hide the emoji picker
+        }
+    });
+    emojiDiv.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
 
         let currentUsername = '';
         let currentUserId = '';
