@@ -5,36 +5,22 @@
     <title>Chat App</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Add these color classes for user messages */
-        .user-color-1 {
-            background-color: #E3F2FD;
-            border-left: 5px solid #2196F3;
-        }
-
-        .user-color-2 {
-            background-color: #F3E5F5;
-            border-left: 5px solid #9C27B0;
-        }
-
-        .user-color-3 {
-            background-color: #E8F5E9;
-            border-left: 5px solid #4CAF50;
-        }
-
-        .user-color-4 {
-            background-color: #FFF3E0;
-            border-left: 5px solid #FF9800;
-        }
-
-        .user-color-5 {
-            background-color: #FCE4EC;
-            border-left: 5px solid #E91E63;
-        }
-
-        .message-own {
-            background-color: #E3F2FD !important;
-            border-right: 5px solid #1E88E5 !important;
+        /* Styling for user and received messages */
+        .message-sent {
+            background-color: #DFFFD6;
+            /* Soft green background */
+            border-right: 5px solid #4CAF50;
+            /* Darker green border */
             margin-left: auto;
+            width: 80%;
+        }
+
+        /* Received messages styling */
+        .message-received {
+            background-color: #EDE7F6;
+            /* Soft lavender background */
+            border-left: 5px solid #7E57C2;
+            /* Purple border */
             width: 80%;
         }
 
@@ -112,50 +98,44 @@
         const emojis = ['😊', '😂', '🥰', '😎', '🤔', '👍', '❤️', '🎉', '🔥', '✨', '🌟', '💯', '😅', '🙌', '🤝', '👋', '🎨', '🚀'];
 
         emojiBtn.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent the click event from bubbling up
-            emojiDiv.classList.toggle('hidden'); // Toggle emoji picker visibility
+            event.stopPropagation();
+            emojiDiv.classList.toggle('hidden');
         });
 
         emojis.forEach(emoji => {
             const emojiButton = document.createElement('button');
             emojiButton.classList.add('emoji-button');
             emojiButton.textContent = emoji;
-            emojiButton.type = 'button';  // Prevent default form submission when clicking
+            emojiButton.type = 'button';
             emojiButton.addEventListener('click', () => {
-                messageInput.value += emoji; // Append emoji to message input
-                messageInput.focus();  // Refocus the input for further typing
+                messageInput.value += emoji;
+                messageInput.focus();
             });
             emojiPicker.appendChild(emojiButton);
         });
 
         document.addEventListener('click', (e) => {
             if (!emojiBtn.contains(e.target) && !emojiDiv.contains(e.target)) {
-                emojiDiv.classList.add('hidden'); // Hide the emoji picker
+                emojiDiv.classList.add('hidden');
             }
         });
 
         let currentUsername = '';
         let currentUserId = '';
         let currentFilePath = null;
-        let userColors = {};
-        let colorIndex = 1;
 
-        // Get current user info when page loads
         fetch('/get-user-info')
             .then(response => response.json())
             .then(user => {
-                currentUsername = user.username;
-                currentUserId = user.userId;
-                currentUserSpan.textContent = `Logged in as: ${currentUsername ? currentUsername : 'Anonymous'}`;
-            });
+                if (user && user.username) {
+                    currentUsername = user.username;
+                    currentUserId = user.userId;
+                    currentUserSpan.textContent = `Logged in as: ${currentUserId}`;
+                } else {
+                    currentUserSpan.textContent = `Not Logged in, cannot deliver messages`;
+                }
 
-        function getColorForUser(username) {
-            if (!userColors[username]) {
-                userColors[username] = colorIndex;
-                colorIndex = colorIndex === 5 ? 1 : colorIndex + 1;
-            }
-            return `user-color-${userColors[username]}`;
-        }
+            });
 
         fileBtn.onclick = () => fileInput.click();
 
@@ -193,7 +173,7 @@
                 messageInput.value = '';
                 currentFilePath = null;
                 fileInput.value = '';
-                emojiDiv.classList.add('hidden'); 
+                emojiDiv.classList.add('hidden');
             }
         });
 
@@ -206,7 +186,7 @@
         function addMessage(data) {
             const isOwnMessage = data.username === currentUsername;
             const div = document.createElement('div');
-            div.className = `p-4 rounded-lg shadow mb-2 ${isOwnMessage ? 'message-own' : getColorForUser(data.username)}`;
+            div.className = `p-4 rounded-lg shadow mb-2 ${isOwnMessage ? 'message-sent' : 'message-received'}`;
 
             const timestamp = new Date(data.created_at).toLocaleTimeString();
 
@@ -251,7 +231,102 @@
             messages.scrollTop = messages.scrollHeight;
         });
     </script>
+    <!--<script>
+        const socket = io(); // Initialize Socket.IO
+        const messages = document.getElementById('messages'); // Assume you have a UL element with this ID
+        const fileInput = document.getElementById('file-input'); // Assume you have a file input element
+        let currentUsername;
 
+        // Fetch current user info
+        fetch('/get-user-info')
+            .then(response => response.json())
+            .then(user => {
+                if (user.error) {
+                    currentUsername = null;
+                    document.getElementById('currentUserSpan').textContent = "Not logged in"; // Change as needed
+                } else {
+                    currentUsername = user.username;
+                    document.getElementById('currentUserSpan').textContent = `Logged in as: ${currentUsername}`;
+                    socket.emit('set username', currentUsername); // Set the username for the socket
+                }
+            });
+
+        // Listen for file messages
+        socket.on('file message', function ({ username, fileUrl }) {
+            const item = document.createElement('li');
+            item.className = 'p-4 rounded-lg shadow mb-2';
+            item.innerHTML = `${username}: <a href="${fileUrl}" class="text-blue-500 hover:text-blue-600" target="_blank">Download File</a>`;
+            messages.appendChild(item);
+            messages.scrollTop = messages.scrollHeight; // Scroll to the bottom of the chat
+        });
+
+        // Handle file uploads
+        fileInput.addEventListener('change', async function () {
+            const file = fileInput.files[0];
+            if (file) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                // Upload the file to the server
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                // Emit file message to the socket
+                if (data.filePath) {
+                    socket.emit('file message', {
+                        username: currentUsername,
+                        fileUrl: data.filePath // Ensure you pass the file URL received from the server
+                    });
+                }
+
+                fileInput.value = ''; // Clear the file input
+            }
+        });
+
+        // Fetch previous messages including file messages when connecting
+        socket.on('previous messages', (messages) => {
+            messages.forEach(addMessage);
+        });
+
+        // Existing message handling function (addMessage)
+        function addMessage(data) {
+            const isOwnMessage = data.username === currentUsername;
+            const div = document.createElement('div');
+            div.className = `p-4 rounded-lg shadow mb-2 ${isOwnMessage ? 'message-own' : 'message-other'}`; // Change class as needed
+
+            const timestamp = new Date(data.created_at).toLocaleTimeString();
+
+            let content = `
+        <div class="flex justify-between items-start mb-1">
+            <span class="font-bold">${data.username}</span>
+            <span class="text-xs text-gray-500">${timestamp}</span>
+        </div>
+        <div class="mt-1">${data.message}</div>
+    `;
+
+            // Check for file messages and append accordingly
+            if (data.filePath) {
+                content += `
+            <div class="mt-2">
+                <a href="${data.filePath}" 
+                   class="text-blue-500 hover:text-blue-600 inline-flex items-center gap-1" 
+                   target="_blank">
+                   📎 Download File
+                </a>
+            </div>
+        `;
+            }
+
+            div.innerHTML = content;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight; // Scroll to the bottom
+        }
+
+    </script>-->
 </body>
 
 </html>
