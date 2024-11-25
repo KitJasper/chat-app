@@ -1,3 +1,5 @@
+CHAT APP USING BACKBONE.JS
+
 - Run xampp, and start apache & mysql
 - add this to create database and its relations:
 
